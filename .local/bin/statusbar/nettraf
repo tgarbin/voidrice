@@ -5,9 +5,10 @@
 # second, gives network traffic per second.
 
 case "$BLOCK_BUTTON" in
-	3) notify-send "🌐 Network traffic module" "🔻: Traffic received
+        1) setsid "$TERMINAL" -e sudo iftop -n & ;;
+        3) notify-send "🌐 Network traffic module" "🔻: Traffic received
 🔺: Traffic transmitted" ;;
-	6) "$TERMINAL" -e "$EDITOR" "$0" ;;
+        6) "$TERMINAL" -e "$EDITOR" "$0" ;;
 esac
 
 rxfile="${XDG_CACHE_HOME:-$HOME/.cache}/rxlog"
@@ -16,9 +17,33 @@ txfile="${XDG_CACHE_HOME:-$HOME/.cache}/txlog"
 rxcurrent="$(cat /sys/class/net/*/statistics/rx_bytes | paste -sd '+' | bc)"
 txcurrent="$(cat /sys/class/net/*/statistics/tx_bytes | paste -sd '+' | bc)"
 
-printf "🔻%sKiB 🔺%sKiB\\n" \
-	"$(printf -- "(%s-%s)/1024\\n" "$rxcurrent" "$(cat "$rxfile")" | bc)" \
-	"$(printf -- "(%s-%s)/1024\\n" "$txcurrent" "$(cat "$txfile")" | bc)"
+rx="$(printf -- "(%s-%s)\\n" "$rxcurrent" "$(cat "$rxfile")" | bc)"
+[ "$rx" -lt '1024' ] && dn=B
+[ "$rx" -ge '1024' ] && dn=KiB
+[ "$rx" -ge '1048576' ] && dn=MiB
+[ "$rx" -ge '1073741824' ] && dn=GiB
+
+tx="$(printf -- "(%s-%s)\\n" "$txcurrent" "$(cat "$txfile")" | bc)"
+[ "$tx" -lt '1024' ] && up=B
+[ "$tx" -ge '1024' ] && up=KiB
+[ "$tx" -ge '1048576' ] && up=MiB
+[ "$tx" -ge '1073741824' ] && up=GiB
+
+case "$dn" in
+        B) dnspeed="$(printf -- "(%s-%s)\\n" "$rxcurrent" "$(cat "$rxfile")" | bc)" ;;
+        KiB) dnspeed="$(printf -- "(%s-%s)/1024\\n" "$rxcurrent" "$(cat "$rxfile")" | bc)" ;;
+        MiB) dnspeed="$(printf -- "((%s-%s)/1024)/1024\\n" "$rxcurrent" "$(cat "$rxfile")" | bc)" ;;
+        GiB) dnspeed="$(printf -- "(((%s-%s)/1024)/1024)/1024\\n" "$rxcurrent" "$(cat "$rxfile")" | bc)" ;;
+esac
+
+case "$up" in
+        B) upspeed="$(printf -- "(%s-%s)\\n" "$txcurrent" "$(cat "$txfile")" | bc)" ;;
+        KiB) upspeed="$(printf -- "(%s-%s)/1024\\n" "$txcurrent" "$(cat "$txfile")" | bc)" ;;
+        MiB) upspeed="$(printf -- "((%s-%s)/1024)/1024\\n" "$txcurrent" "$(cat "$txfile")" | bc)" ;;
+        GiB) upspeed="$(printf -- "(((%s-%s)/1024)/1024)/1042\\n" "$txcurrent" "$(cat "$txfile")" | bc)" ;;
+esac
+
+printf "🔻%s$dn 🔺%s$up\\n" "$dnspeed" "$upspeed"
 
 # Log the current values for next run.
 echo "$rxcurrent" > "$rxfile"
